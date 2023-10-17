@@ -2,18 +2,18 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12\Build\x64\Debug\Client.exe</FullPath>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12_terrain\DirectX12\Build\x64\Debug\Client.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles>
     <ContentFile>
-      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12\Build\x64\Debug\PS.cso</FullPath>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12_terrain\DirectX12\Build\x64\Debug\PS.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12\Build\x64\Debug\Shader.cso</FullPath>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12_terrain\DirectX12\Build\x64\Debug\Shader.cso</FullPath>
     </ContentFile>
     <ContentFile>
-      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12\Build\x64\Debug\VS.cso</FullPath>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\DirectX12_terrain\DirectX12\Build\x64\Debug\VS.cso</FullPath>
     </ContentFile>
   </ContentFiles>
   <SatelliteDlls />

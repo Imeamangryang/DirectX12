@@ -17,3 +17,14 @@
 
 using namespace Microsoft::WRL;
 using namespace DirectX;
+
+struct Vertex
+{
+    XMFLOAT3 position;
+    XMFLOAT4 color;
+};
+
+struct Index
+{
+    UINT16 index;
+};

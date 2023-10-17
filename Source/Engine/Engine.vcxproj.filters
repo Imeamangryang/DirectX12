@@ -22,12 +22,6 @@
     <Filter Include="헤더 파일\Render">
       <UniqueIdentifier>{0f2030f3-d05f-4a23-8ea0-aefb5e71d08a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Client">
-      <UniqueIdentifier>{dc63cca6-4db1-49ae-895b-17095a3976fc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\Client">
-      <UniqueIdentifier>{20a2aa50-aba4-47c5-8dbb-eb51343f5004}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\Render">
       <UniqueIdentifier>{9d2a0f11-0e56-4105-ba21-7e58894a6142}</UniqueIdentifier>
     </Filter>
