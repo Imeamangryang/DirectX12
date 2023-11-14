@@ -12,12 +12,10 @@ cbuffer ConstantBuffer : register(b0)
 struct VS_OUTPUT
 {
 	float4 pos : SV_POSITION;
-	float4 worldpos : POSITION;
 	float4 norm : NORMAL;
-	float4 tex : TEXCOORD;
 };
 
-float4 PS(VS_OUTPUT input) : SV_TARGET
+float4 PSTes(VS_OUTPUT input) : SV_TARGET
 {
 	float4 light = normalize(float4(1.0f, 1.0f, -1.0f, 1.0f));
 	float diffuse = saturate(dot(input.norm, -light));

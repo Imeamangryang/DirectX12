@@ -47,6 +47,7 @@ static LRESULT CALLBACK WndProc(HWND win , UINT msg, WPARAM wp, LPARAM lp) {
 	{
 		case WM_DESTROY:
 			PostQuitMessage(0);
+			exit(100);
 			return 0;
 
 		case WM_CLOSE:

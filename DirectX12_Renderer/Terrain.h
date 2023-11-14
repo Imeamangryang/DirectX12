@@ -48,14 +48,14 @@ public:
 	Terrain(Graphics* renderer);
 	~Terrain();
 
-	void Draw2D(ID3D12GraphicsCommandList* m_commandList);
+	void DrawTes(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye);
 	void Draw3D(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye);
 
 	void ClearUnusedUploadBuffersAfterInit();
 
 private:
 
-	void InitPipeline2D(Graphics* Renderer);
+	void InitPipelineTes(Graphics* Renderer);
 	void InitPipeline3D(Graphics* Renderer);
 	void CreateConstantBuffer(Graphics* Renderer);
 	void CreateMesh3D(Graphics* Renderer);
@@ -68,9 +68,9 @@ private:
 	UINT m_width;
 	UINT m_height;
 
-	ID3D12PipelineState* m_pipelineState2D;
+	ID3D12PipelineState* m_pipelineStateTes;
 	ID3D12PipelineState* m_pipelineState3D;
-	ID3D12RootSignature* m_rootSignature2D;
+	ID3D12RootSignature* m_rootSignatureTes;
 	ID3D12RootSignature* m_rootSignature3D;
 	ID3D12Resource* m_CBV;
 	ConstantBuffer m_constantBufferData;

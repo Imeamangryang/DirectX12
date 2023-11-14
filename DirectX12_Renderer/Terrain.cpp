@@ -1,9 +1,9 @@
 #include "Terrain.h"
 
 Terrain::Terrain(Graphics* renderer) :
-	m_pipelineState2D(nullptr),
+	m_pipelineStateTes(nullptr),
 	m_pipelineState3D(nullptr),
-	m_rootSignature2D(nullptr),
+	m_rootSignatureTes(nullptr),
 	m_rootSignature3D(nullptr),
 	m_srvHeap(nullptr),
 	m_uploadHeap(nullptr),
@@ -27,8 +27,9 @@ Terrain::Terrain(Graphics* renderer) :
 	m_srvDescSize = renderer->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	LoadHeightMap(renderer, L"ldem_16.tif");
-	InitPipeline2D(renderer);
+	
 	InitPipeline3D(renderer);
+	InitPipelineTes(renderer);
 }
 
 Terrain::~Terrain()
@@ -63,20 +64,20 @@ Terrain::~Terrain()
 		m_vertexBuffer->Release();
 		m_vertexBuffer = nullptr;
 	}
-	if (m_pipelineState2D)
+	if (m_pipelineStateTes)
 	{
-		m_pipelineState2D->Release();
-		m_pipelineState2D = nullptr;
+		m_pipelineStateTes->Release();
+		m_pipelineStateTes = nullptr;
 	}
 	if (m_pipelineState3D)
 	{
 		m_pipelineState3D->Release();
 		m_pipelineState3D = nullptr;
 	}
-	if (m_rootSignature2D)
+	if (m_rootSignatureTes)
 	{
-		m_rootSignature2D->Release();
-		m_rootSignature2D = nullptr;
+		m_rootSignatureTes->Release();
+		m_rootSignatureTes = nullptr;
 	}
 	if (m_rootSignature3D)
 	{
@@ -92,15 +93,28 @@ Terrain::~Terrain()
 	}
 }
 
-void Terrain::Draw2D(ID3D12GraphicsCommandList* m_commandList)
+void Terrain::DrawTes(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye)
 {
-	m_commandList->SetPipelineState(m_pipelineState2D);
-	m_commandList->SetGraphicsRootSignature(m_rootSignature2D);
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_commandList->SetPipelineState(m_pipelineStateTes);
+	m_commandList->SetGraphicsRootSignature(m_rootSignatureTes);
+
+	m_constantBufferData.viewproj = viewproj;
+	m_constantBufferData.eye = eye;
+	m_constantBufferData.height = m_height;
+	m_constantBufferData.width = m_width;
+	memcpy(m_cbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
 	ID3D12DescriptorHeap* heaps[] = { m_srvHeap };
-	m_commandList->SetDescriptorHeaps(1, heaps);
+	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
-	m_commandList->DrawInstanced(3, 1, 0, 0);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 1, m_srvDescSize);
+	m_commandList->SetGraphicsRootDescriptorTable(1, cbvHandle);
+
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST); // describe how to read the vertex buffer.
+	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	m_commandList->IASetIndexBuffer(&m_indexBufferView);
+
+	m_commandList->DrawIndexedInstanced(m_indexcount, 1, 0, 0, 0);
 }
 
 void Terrain::Draw3D(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye)
@@ -120,7 +134,7 @@ void Terrain::Draw3D(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewpr
 	CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 1, m_srvDescSize);
 	m_commandList->SetGraphicsRootDescriptorTable(1, cbvHandle);
 	
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP); // describe how to read the vertex buffer.
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // describe how to read the vertex buffer.
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
 	m_commandList->IASetIndexBuffer(&m_indexBufferView);
 
@@ -146,50 +160,71 @@ void Terrain::ClearUnusedUploadBuffersAfterInit()
 	}
 }
 
-void Terrain::InitPipeline2D(Graphics* Renderer)
+void Terrain::InitPipelineTes(Graphics* Renderer)
 {
+	CD3DX12_DESCRIPTOR_RANGE range[2];
+	CD3DX12_ROOT_PARAMETER paramsRoot[2];
 	// Root Signature 积己
-	CD3DX12_DESCRIPTOR_RANGE rangeRoot = {};
-	rangeRoot.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-	CD3DX12_ROOT_PARAMETER paramsRoot[1];
-	paramsRoot[0].InitAsDescriptorTable(1, &rangeRoot);
+	range[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	paramsRoot[0].InitAsDescriptorTable(1, &range[0]);
+
+	// ConstantBufferview甫 困茄 Root Parameter
+	range[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	paramsRoot[1].InitAsDescriptorTable(1, &range[1], D3D12_SHADER_VISIBILITY_ALL);
+
 	CD3DX12_STATIC_SAMPLER_DESC descSamplers[1];
 	descSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
 	rootDesc.Init(
-		1,
+		_countof(paramsRoot),
 		paramsRoot,
 		1,
 		descSamplers,
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS);
-	Renderer->createRootSignature(&rootDesc, m_rootSignature2D);
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	Renderer->createRootSignature(&rootDesc, m_rootSignatureTes);
 
 	// Shader Compile
 	D3D12_SHADER_BYTECODE PSBytecode = {};
 	D3D12_SHADER_BYTECODE VSBytecode = {};
-	Renderer->CompileShader(L"Shader.fx", "VS", VSBytecode, VERTEX_SHADER);
-	Renderer->CompileShader(L"Shader.fx", "PS", PSBytecode, PIXEL_SHADER);
+	D3D12_SHADER_BYTECODE HSBytecode = {};
+	D3D12_SHADER_BYTECODE DSBytecode = {};
+	Renderer->CompileShader(L"VertexShaderTes.hlsl", "VSTes", VSBytecode, VERTEX_SHADER);
+	Renderer->CompileShader(L"PixelShaderTes.hlsl", "PSTes", PSBytecode, PIXEL_SHADER);
+	Renderer->CompileShader(L"HullShader.hlsl", "HS", HSBytecode, HULL_SHADER);
+	Renderer->CompileShader(L"DomainShader.hlsl", "DS", DSBytecode, DOMAIN_SHADER);
+
+	// Input Layout 积己
+	D3D12_INPUT_ELEMENT_DESC inputLayout[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
+
+	D3D12_INPUT_LAYOUT_DESC	inputLayoutDesc = {};
+	inputLayoutDesc.NumElements = sizeof(inputLayout) / sizeof(D3D12_INPUT_ELEMENT_DESC);
+	inputLayoutDesc.pInputElementDescs = inputLayout;
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-	psoDesc.pRootSignature = m_rootSignature2D;
+	psoDesc.InputLayout = inputLayoutDesc;
+	psoDesc.pRootSignature = m_rootSignatureTes;
 	psoDesc.VS = VSBytecode;
 	psoDesc.PS = PSBytecode;
+	psoDesc.HS = HSBytecode;
+	psoDesc.DS = DSBytecode;
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	psoDesc.DepthStencilState.DepthEnable = false;
-	psoDesc.DepthStencilState.StencilEnable = false;
-	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
 	psoDesc.NumRenderTargets = 1;
 	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	psoDesc.SampleDesc.Count = 1;
 
-	Renderer->createPSO(&psoDesc, m_pipelineState2D);
+	Renderer->createPSO(&psoDesc, m_pipelineStateTes);
 }
 
 void Terrain::InitPipeline3D(Graphics* Renderer)
@@ -225,8 +260,8 @@ void Terrain::InitPipeline3D(Graphics* Renderer)
 	// Shader Compile
 	D3D12_SHADER_BYTECODE PSBytecode = {};
 	D3D12_SHADER_BYTECODE VSBytecode = {};
-	Renderer->CompileShader(L"Shader.fx", "VS2", VSBytecode, VERTEX_SHADER);
-	Renderer->CompileShader(L"Shader.fx", "PS2", PSBytecode, PIXEL_SHADER);
+	Renderer->CompileShader(L"VertexShader.hlsl", "VS", VSBytecode, VERTEX_SHADER);
+	Renderer->CompileShader(L"PixelShader.hlsl", "PS", PSBytecode, PIXEL_SHADER);
 
 	// Input Layout 积己
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = 
@@ -247,6 +282,7 @@ void Terrain::InitPipeline3D(Graphics* Renderer)
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	psoDesc.NumRenderTargets = 1;
@@ -317,27 +353,21 @@ void Terrain::CreateMesh3D(Graphics* Renderer)
 
 
 	// Index Buffer 积己
-	int stripSize = width * 2;
-	int numStrips = height - 1;
-	arraysize = stripSize * numStrips + (numStrips - 1) * 4;
+	arraysize = (m_width - 1) * (m_height - 1) * 6;
 
 	UINT* indices = new UINT[arraysize];
 	int i = 0;
-	for (int s = 0; s < numStrips; ++s) 
+	for (int y = 0; y < m_height - 1; ++y)
 	{
-		int m = 0;
-		for (int n = 0; n < width; ++n) 
+		for (int x = 0; x < m_width - 1; ++x)
 		{
-			m = n + s * width;
-			indices[i++] = m + width;
-			indices[i++] = m;
-		}
-		if (s < numStrips - 1) 
-		{
-			indices[i++] = m;
-			indices[i++] = m - width + 1;
-			indices[i++] = m - width + 1;
-			indices[i++] = m - width + 1;
+			indices[i++] = x + y * m_width;
+			indices[i++] = x + 1 + y * m_width;
+			indices[i++] = x + (y + 1) * m_width;
+
+			indices[i++] = x + 1 + y * m_width;
+			indices[i++] = x + 1 + (y + 1) * m_width;
+			indices[i++] = x + (y + 1) * m_width;
 		}
 	}
 

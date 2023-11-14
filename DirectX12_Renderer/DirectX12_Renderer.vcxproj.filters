@@ -64,10 +64,16 @@
     <FxCompile Include="Shader.fx">
       <Filter>Resource Files</Filter>
     </FxCompile>
-    <FxCompile Include="VertexShader2.hlsl">
+    <FxCompile Include="VertexShaderTes.hlsl">
       <Filter>Resource Files</Filter>
     </FxCompile>
-    <FxCompile Include="PixelShader2.hlsl">
+    <FxCompile Include="PixelShaderTes.hlsl">
+      <Filter>Resource Files</Filter>
+    </FxCompile>
+    <FxCompile Include="HullShader.hlsl">
+      <Filter>Resource Files</Filter>
+    </FxCompile>
+    <FxCompile Include="DomainShader.hlsl">
       <Filter>Resource Files</Filter>
     </FxCompile>
   </ItemGroup>
