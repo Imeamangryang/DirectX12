@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\백업용\x64\Debug\DirectX12_Renderer.exe</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles>
+    <ContentFile>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\백업용\x64\Debug\PixelShader.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\백업용\x64\Debug\PixelShader2.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\백업용\x64\Debug\Shader.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\백업용\x64\Debug\VertexShader.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Users\jione\Desktop\펄어비스\백업용\x64\Debug\VertexShader2.cso</FullPath>
+    </ContentFile>
+  </ContentFiles>
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

@@ -1,0 +1,509 @@
+#include "Terrain.h"
+
+Terrain::Terrain(Graphics* renderer) :
+	m_pipelineState2D(nullptr),
+	m_pipelineState3D(nullptr),
+	m_rootSignature2D(nullptr),
+	m_rootSignature3D(nullptr),
+	m_srvHeap(nullptr),
+	m_uploadHeap(nullptr),
+	m_image(),
+	m_width(0),
+	m_height(0),
+	m_CBV(nullptr),
+	m_vertexBuffer(nullptr),
+	m_vertexBufferUpload(nullptr),
+	m_indexBuffer(nullptr),
+	m_indexBufferUpload(nullptr)
+{
+	// SRV Discriptor Heap 持失
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+	srvHeapDesc.NumDescriptors = 2;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	renderer->CreateDescriptorHeap(&srvHeapDesc, m_srvHeap);
+	m_srvHeap->SetName(L"CBV/SRV Heap");
+
+	m_srvDescSize = renderer->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	LoadHeightMap(renderer, L"ldem_16.tif");
+	InitPipeline2D(renderer);
+	InitPipeline3D(renderer);
+}
+
+Terrain::~Terrain()
+{
+	if (m_srvHeap)
+	{
+		m_srvHeap->Release();
+		m_srvHeap = nullptr;
+	}
+	if (m_uploadHeap)
+	{
+		m_uploadHeap->Release();
+		m_uploadHeap = nullptr;
+	}
+	if (m_indexBufferUpload)
+	{
+		m_indexBufferUpload->Release();
+		m_indexBufferUpload = nullptr;
+	}
+	if (m_indexBuffer)
+	{
+		m_indexBuffer->Release();
+		m_indexBuffer = nullptr;
+	}
+	if (m_vertexBufferUpload)
+	{
+		m_vertexBufferUpload->Release();
+		m_vertexBufferUpload = nullptr;
+	}
+	if (m_vertexBuffer)
+	{
+		m_vertexBuffer->Release();
+		m_vertexBuffer = nullptr;
+	}
+	if (m_pipelineState2D)
+	{
+		m_pipelineState2D->Release();
+		m_pipelineState2D = nullptr;
+	}
+	if (m_pipelineState3D)
+	{
+		m_pipelineState3D->Release();
+		m_pipelineState3D = nullptr;
+	}
+	if (m_rootSignature2D)
+	{
+		m_rootSignature2D->Release();
+		m_rootSignature2D = nullptr;
+	}
+	if (m_rootSignature3D)
+	{
+		m_rootSignature3D->Release();
+		m_rootSignature3D = nullptr;
+	}
+	if (m_CBV)
+	{
+		m_CBV->Unmap(0, nullptr);
+		m_cbvDataBegin = nullptr;
+		m_CBV->Release();
+		m_CBV = nullptr;
+	}
+}
+
+void Terrain::Draw2D(ID3D12GraphicsCommandList* m_commandList)
+{
+	m_commandList->SetPipelineState(m_pipelineState2D);
+	m_commandList->SetGraphicsRootSignature(m_rootSignature2D);
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	ID3D12DescriptorHeap* heaps[] = { m_srvHeap };
+	m_commandList->SetDescriptorHeaps(1, heaps);
+	m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+	m_commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+void Terrain::Draw3D(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye)
+{
+	m_commandList->SetPipelineState(m_pipelineState3D);
+	m_commandList->SetGraphicsRootSignature(m_rootSignature3D);
+
+	m_constantBufferData.viewproj = viewproj;
+	m_constantBufferData.eye = eye;
+	m_constantBufferData.height = m_height;
+	m_constantBufferData.width = m_width;
+	memcpy(m_cbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
+	ID3D12DescriptorHeap* heaps[] = { m_srvHeap };
+	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
+	m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+	CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 1, m_srvDescSize);
+	m_commandList->SetGraphicsRootDescriptorTable(1, cbvHandle);
+	
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP); // describe how to read the vertex buffer.
+	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	m_commandList->IASetIndexBuffer(&m_indexBufferView);
+
+	m_commandList->DrawIndexedInstanced(m_indexcount, 1, 0, 0, 0);
+}
+
+void Terrain::ClearUnusedUploadBuffersAfterInit()
+{
+	if (m_uploadHeap)
+	{
+		m_uploadHeap->Release();
+		m_uploadHeap = nullptr;
+	}
+	if (m_indexBufferUpload)
+	{
+		m_indexBufferUpload->Release();
+		m_indexBufferUpload = nullptr;
+	}
+	if (m_vertexBufferUpload) 
+	{
+		m_vertexBufferUpload->Release();
+		m_vertexBufferUpload = nullptr;
+	}
+}
+
+void Terrain::InitPipeline2D(Graphics* Renderer)
+{
+	// Root Signature 持失
+	CD3DX12_DESCRIPTOR_RANGE rangeRoot = {};
+	rangeRoot.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	CD3DX12_ROOT_PARAMETER paramsRoot[1];
+	paramsRoot[0].InitAsDescriptorTable(1, &rangeRoot);
+	CD3DX12_STATIC_SAMPLER_DESC descSamplers[1];
+	descSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
+	rootDesc.Init(
+		1,
+		paramsRoot,
+		1,
+		descSamplers,
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS);
+	Renderer->createRootSignature(&rootDesc, m_rootSignature2D);
+
+	// Shader Compile
+	D3D12_SHADER_BYTECODE PSBytecode = {};
+	D3D12_SHADER_BYTECODE VSBytecode = {};
+	Renderer->CompileShader(L"Shader.fx", "VS", VSBytecode, VERTEX_SHADER);
+	Renderer->CompileShader(L"Shader.fx", "PS", PSBytecode, PIXEL_SHADER);
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.pRootSignature = m_rootSignature2D;
+	psoDesc.VS = VSBytecode;
+	psoDesc.PS = PSBytecode;
+	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	psoDesc.SampleMask = UINT_MAX;
+	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	psoDesc.DepthStencilState.DepthEnable = false;
+	psoDesc.DepthStencilState.StencilEnable = false;
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	psoDesc.SampleDesc.Count = 1;
+
+	Renderer->createPSO(&psoDesc, m_pipelineState2D);
+}
+
+void Terrain::InitPipeline3D(Graphics* Renderer)
+{
+	CD3DX12_DESCRIPTOR_RANGE range[2];
+	CD3DX12_ROOT_PARAMETER paramsRoot[2];
+	// Root Signature 持失
+	range[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	paramsRoot[0].InitAsDescriptorTable(1, &range[0]);
+	
+	// ConstantBufferview研 是廃 Root Parameter
+	range[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	paramsRoot[1].InitAsDescriptorTable(1, &range[1], D3D12_SHADER_VISIBILITY_ALL);
+	
+	CD3DX12_STATIC_SAMPLER_DESC descSamplers[1];
+	descSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
+	rootDesc.Init(
+		_countof(paramsRoot),
+		paramsRoot,
+		1,
+		descSamplers,
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	Renderer->createRootSignature(&rootDesc, m_rootSignature3D);
+
+	CreateConstantBuffer(Renderer);
+
+	// Shader Compile
+	D3D12_SHADER_BYTECODE PSBytecode = {};
+	D3D12_SHADER_BYTECODE VSBytecode = {};
+	Renderer->CompileShader(L"Shader.fx", "VS2", VSBytecode, VERTEX_SHADER);
+	Renderer->CompileShader(L"Shader.fx", "PS2", PSBytecode, PIXEL_SHADER);
+
+	// Input Layout 持失
+	D3D12_INPUT_ELEMENT_DESC inputLayout[] = 
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
+
+	D3D12_INPUT_LAYOUT_DESC	inputLayoutDesc = {};
+	inputLayoutDesc.NumElements = sizeof(inputLayout) / sizeof(D3D12_INPUT_ELEMENT_DESC);
+	inputLayoutDesc.pInputElementDescs = inputLayout;
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.pRootSignature = m_rootSignature3D;
+	psoDesc.InputLayout = inputLayoutDesc;
+	psoDesc.VS = VSBytecode;
+	psoDesc.PS = PSBytecode;
+	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	psoDesc.SampleMask = UINT_MAX;
+	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	psoDesc.SampleDesc.Count = 1;
+
+	Renderer->createPSO(&psoDesc, m_pipelineState3D);
+
+	CreateMesh3D(Renderer);
+	//CreateSphere(Renderer, 100, 100, 100);
+}
+
+void Terrain::CreateConstantBuffer(Graphics* Renderer)
+{
+	UINT64 bufferSize = sizeof(ConstantBuffer);
+	Renderer->CreateBuffer(m_CBV, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+	m_CBV->SetName(L"CBV");
+
+	// ConstantBufferView 持失
+	D3D12_CONSTANT_BUFFER_VIEW_DESC	cbvDesc = {};
+	cbvDesc.BufferLocation = m_CBV->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = (bufferSize + 255) & ~255; // Constant Buffer澗 256 byte aligned
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 1, m_srvDescSize);
+
+	Renderer->CreateCBV(&cbvDesc, srvHandle);
+
+	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
+
+	CD3DX12_RANGE readRange(0, 0); 
+	if (FAILED(m_CBV->Map(0, &readRange, reinterpret_cast<void**>(&m_cbvDataBegin)))) 
+	{
+		throw (GFX_Exception("Failed to map CBV in Terrain."));
+	}
+}
+
+void Terrain::CreateMesh3D(Graphics* Renderer)
+{
+	int height = 1080;
+	int width = 1920;
+	int arraysize = height * width;
+
+	// Vertex Buffer 持失
+	Vertex1 *vertices = new Vertex1[arraysize];
+	for (int y = 0; y < height; ++y) 
+	{
+		for (int x = 0; x < width; ++x) 
+		{
+			vertices[y * width + x].position = XMFLOAT3((float)x, (float)y, 0.0f);
+		}
+	}
+
+	int bufferSize = sizeof(Vertex1) * arraysize;
+
+	Renderer->CreateCommittedBuffer(m_vertexBuffer, m_vertexBufferUpload, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+
+	D3D12_SUBRESOURCE_DATA vertexData = {};
+	vertexData.pData = vertices;
+	vertexData.RowPitch = bufferSize;
+	vertexData.SlicePitch = bufferSize;
+
+	UpdateSubresources(Renderer->GetCommandList(), m_vertexBuffer, m_vertexBufferUpload, 0, 0, 1, &vertexData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vertexBufferView.StrideInBytes = sizeof(Vertex1);
+	m_vertexBufferView.SizeInBytes = bufferSize;
+
+
+	// Index Buffer 持失
+	int stripSize = width * 2;
+	int numStrips = height - 1;
+	arraysize = stripSize * numStrips + (numStrips - 1) * 4;
+
+	UINT* indices = new UINT[arraysize];
+	int i = 0;
+	for (int s = 0; s < numStrips; ++s) 
+	{
+		int m = 0;
+		for (int n = 0; n < width; ++n) 
+		{
+			m = n + s * width;
+			indices[i++] = m + width;
+			indices[i++] = m;
+		}
+		if (s < numStrips - 1) 
+		{
+			indices[i++] = m;
+			indices[i++] = m - width + 1;
+			indices[i++] = m - width + 1;
+			indices[i++] = m - width + 1;
+		}
+	}
+
+	bufferSize = sizeof(UINT) * arraysize;
+
+	Renderer->CreateCommittedBuffer(m_indexBuffer, m_indexBufferUpload, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+
+	D3D12_SUBRESOURCE_DATA indexData = {};
+	indexData.pData = indices;
+	indexData.RowPitch = bufferSize;
+	indexData.SlicePitch = bufferSize;
+
+	UpdateSubresources(Renderer->GetCommandList(), m_indexBuffer, m_indexBufferUpload, 0, 0, 1, &indexData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER));
+
+	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+	m_indexBufferView.SizeInBytes = bufferSize;
+
+	m_indexcount = arraysize;
+}
+
+void Terrain::LoadHeightMap(Graphics* Renderer, const wchar_t* filename)
+{
+	std::unique_ptr<uint8_t[]> decodedData;
+	ID3D12Resource* texture;
+	D3D12_SUBRESOURCE_DATA textureData;
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC	srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	//srvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+
+	LoadWICTextureFromFileEx(Renderer->GetDevice(), L"ldem_16.tif", 0, D3D12_RESOURCE_FLAG_NONE, WIC_LOADER_FORCE_RGBA32, &texture, decodedData, textureData);
+
+	D3D12_RESOURCE_DESC texDesc = texture->GetDesc();
+	m_width = texDesc.Width;
+	m_height = texDesc.Height;
+
+	const UINT64 uploadBufferSize = GetRequiredIntermediateSize(texture, 0, 1);
+		
+	Renderer->GetDevice()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize), D3D12_RESOURCE_STATE_GENERIC_READ,
+		NULL, IID_PPV_ARGS(&m_uploadHeap));
+
+	//const unsigned int subresourceCount = texDesc.DepthOrArraySize * texDesc.MipLevels;
+	UpdateSubresources(Renderer->GetCommandList(), texture, m_uploadHeap, 0, 0, 1, &textureData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+	Renderer->CreateSRV(texture, &srvDesc, m_srvHeap);
+}
+
+void Terrain::CreateSphere(Graphics* Renderer, float radius, UINT slice, UINT stack)
+{
+	std::vector<Vertex> vertices;
+
+	Vertex topVertex(0.0f, +radius, 0.0f, 0.0f, +1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	Vertex bottomVertex(0.0f, -radius, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+	vertices.push_back(topVertex);
+
+	float phiStep = XM_PI / stack;
+	float thetaStep = 2.0f * XM_PI / slice;
+
+	for(int i = 1; i <= stack-1; ++i)
+	{
+		float phi = i*phiStep;
+
+		// Vertices of ring.
+        for(int j = 0; j <= slice; ++j)
+		{
+			float theta = j*thetaStep;
+
+			Vertex v;
+
+			// spherical to cartesian
+			v.Position.x = radius*sinf(phi)*cosf(theta);
+			v.Position.y = radius*cosf(phi);
+			v.Position.z = radius*sinf(phi)*sinf(theta);
+
+			// Partial derivative of P with respect to theta
+			v.TangentU.x = -radius*sinf(phi)*sinf(theta);
+			v.TangentU.y = 0.0f;
+			v.TangentU.z = +radius*sinf(phi)*cosf(theta);
+
+			XMVECTOR T = XMLoadFloat3(&v.TangentU);
+			XMStoreFloat3(&v.TangentU, XMVector3Normalize(T));
+
+			XMVECTOR p = XMLoadFloat3(&v.Position);
+			XMStoreFloat3(&v.Normal, XMVector3Normalize(p));
+
+			v.TexC.x = theta / XM_2PI;
+			v.TexC.y = phi / XM_PI;
+
+			vertices.push_back( v );
+		}
+	}
+
+	vertices.push_back(bottomVertex);
+
+	int bufferSize = sizeof(Vertex) * vertices.size();
+
+	Renderer->CreateCommittedBuffer(m_vertexBuffer, m_vertexBufferUpload, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+
+	D3D12_SUBRESOURCE_DATA vertexData = {};
+	vertexData.pData = &vertices[0];
+	vertexData.RowPitch = bufferSize;
+	vertexData.SlicePitch = bufferSize;
+
+	UpdateSubresources(Renderer->GetCommandList(), m_vertexBuffer, m_vertexBufferUpload, 0, 0, 1, &vertexData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+	m_vertexBufferView.SizeInBytes = bufferSize;
+
+	std::vector<UINT> indices;
+
+	for (int i = 1; i <= slice; ++i)
+	{
+		indices.push_back(0);
+		indices.push_back(i + 1);
+		indices.push_back(i);
+	}
+
+	int baseIndex = 1;
+	int ringVertexCount = slice + 1;
+	for (int i = 0; i < stack - 2; ++i)
+	{
+		for (int j = 0; j < slice; ++j)
+		{
+			indices.push_back(baseIndex + i * ringVertexCount + j);
+			indices.push_back(baseIndex + i * ringVertexCount + j + 1);
+			indices.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+
+			indices.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+			indices.push_back(baseIndex + i * ringVertexCount + j + 1);
+			indices.push_back(baseIndex + (i + 1) * ringVertexCount + j + 1);
+		}
+	}
+
+	int southPoleIndex = vertices.size() - 1;
+	baseIndex = southPoleIndex = ringVertexCount;
+	for (int i = 0; i < slice; ++i)
+	{
+		indices.push_back(southPoleIndex);
+		indices.push_back(baseIndex + i);
+		indices.push_back(baseIndex + i + 1);
+	}
+
+	bufferSize = sizeof(UINT) * indices.size();
+
+	Renderer->CreateCommittedBuffer(m_indexBuffer, m_indexBufferUpload, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+
+	D3D12_SUBRESOURCE_DATA indexData = {};
+	indexData.pData = &indices[0];
+	indexData.RowPitch = bufferSize;
+	indexData.SlicePitch = bufferSize;
+
+	UpdateSubresources(Renderer->GetCommandList(), m_indexBuffer, m_indexBufferUpload, 0, 0, 1, &indexData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER));
+
+	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+	m_indexBufferView.SizeInBytes = bufferSize;
+
+	m_indexcount = indices.size();
+}
