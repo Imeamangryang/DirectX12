@@ -5,7 +5,7 @@
 
 using namespace graphics;
 
-#define SPEED 50.0f
+#define SPEED 300.0f
 #define ROT_ANGLE 0.75f
 
 struct InputDirections

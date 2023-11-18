@@ -3,8 +3,10 @@
 Terrain::Terrain(Graphics* renderer) :
 	m_pipelineStateTes(nullptr),
 	m_pipelineState3D(nullptr),
+	m_pipelineState2D(nullptr),
 	m_rootSignatureTes(nullptr),
 	m_rootSignature3D(nullptr),
+	m_rootSignature2D(nullptr),
 	m_srvHeap(nullptr),
 	m_uploadHeap(nullptr),
 	m_image(),
@@ -16,18 +18,9 @@ Terrain::Terrain(Graphics* renderer) :
 	m_indexBuffer(nullptr),
 	m_indexBufferUpload(nullptr)
 {
-	// SRV Discriptor Heap 积己
-	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 2;
-	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	renderer->CreateDescriptorHeap(&srvHeapDesc, m_srvHeap);
-	m_srvHeap->SetName(L"CBV/SRV Heap");
-
-	m_srvDescSize = renderer->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
 	LoadHeightMap(renderer, L"ldem_16.tif");
 	
+	InitPipeline2D(renderer);
 	InitPipeline3D(renderer);
 	InitPipelineTes(renderer);
 }
@@ -74,6 +67,11 @@ Terrain::~Terrain()
 		m_pipelineState3D->Release();
 		m_pipelineState3D = nullptr;
 	}
+	if (m_pipelineState2D)
+	{
+		m_pipelineState2D->Release();
+		m_pipelineState2D = nullptr;
+	}
 	if (m_rootSignatureTes)
 	{
 		m_rootSignatureTes->Release();
@@ -83,6 +81,11 @@ Terrain::~Terrain()
 	{
 		m_rootSignature3D->Release();
 		m_rootSignature3D = nullptr;
+	}
+	if (m_rootSignature2D)
+	{
+		m_rootSignature2D->Release();
+		m_rootSignature2D = nullptr;
 	}
 	if (m_CBV)
 	{
@@ -133,12 +136,32 @@ void Terrain::Draw3D(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewpr
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 	CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 1, m_srvDescSize);
 	m_commandList->SetGraphicsRootDescriptorTable(1, cbvHandle);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvhandle2(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 2, m_srvDescSize);
+	m_commandList->SetGraphicsRootDescriptorTable(2, srvhandle2);
 	
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // describe how to read the vertex buffer.
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
 	m_commandList->IASetIndexBuffer(&m_indexBufferView);
 
 	m_commandList->DrawIndexedInstanced(m_indexcount, 1, 0, 0, 0);
+}
+
+void Terrain::Draw2D(ID3D12GraphicsCommandList* m_commandList)
+{
+	m_commandList->SetPipelineState(m_pipelineState2D);
+	m_commandList->SetGraphicsRootSignature(m_rootSignature2D);
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // describe how to read the vertex buffer.
+	ID3D12DescriptorHeap* heaps[] = { m_srvHeap };
+	m_commandList->SetDescriptorHeaps(1, heaps);
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvhandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_srvDescSize);
+	m_commandList->SetGraphicsRootDescriptorTable(0, srvhandle);
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvhandle2(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 2, m_srvDescSize);
+	m_commandList->SetGraphicsRootDescriptorTable(2, srvhandle2);
+
+
+	m_commandList->DrawInstanced(3, 1, 0, 0);
 }
 
 void Terrain::ClearUnusedUploadBuffersAfterInit()
@@ -229,24 +252,30 @@ void Terrain::InitPipelineTes(Graphics* Renderer)
 
 void Terrain::InitPipeline3D(Graphics* Renderer)
 {
-	CD3DX12_DESCRIPTOR_RANGE range[2];
-	CD3DX12_ROOT_PARAMETER paramsRoot[2];
 	// Root Signature 积己
+	CD3DX12_DESCRIPTOR_RANGE range[3];
+	CD3DX12_ROOT_PARAMETER paramsRoot[3];
+	// Slot : Displacement Map, Register(t0)
 	range[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 	paramsRoot[0].InitAsDescriptorTable(1, &range[0]);
 	
 	// ConstantBufferview甫 困茄 Root Parameter
 	range[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 	paramsRoot[1].InitAsDescriptorTable(1, &range[1], D3D12_SHADER_VISIBILITY_ALL);
+
+	// Slot : Color Map, Register(t1)
+	range[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+	paramsRoot[2].InitAsDescriptorTable(1, &range[2]);
 	
-	CD3DX12_STATIC_SAMPLER_DESC descSamplers[1];
+	CD3DX12_STATIC_SAMPLER_DESC descSamplers[2];
 	descSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	descSamplers[1].Init(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
 	rootDesc.Init(
 		_countof(paramsRoot),
 		paramsRoot,
-		1,
+		2,
 		descSamplers,
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
@@ -295,6 +324,66 @@ void Terrain::InitPipeline3D(Graphics* Renderer)
 	//CreateSphere(Renderer, 100, 100, 100);
 }
 
+void Terrain::InitPipeline2D(Graphics* Renderer)
+{
+	// Root Signature 积己
+	CD3DX12_DESCRIPTOR_RANGE range[3];
+	CD3DX12_ROOT_PARAMETER paramsRoot[3];
+	// Slot : Displacement Map, Register(t0)
+	range[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	paramsRoot[0].InitAsDescriptorTable(1, &range[0]);
+
+	// ConstantBufferview甫 困茄 Root Parameter
+	range[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	paramsRoot[1].InitAsDescriptorTable(1, &range[1], D3D12_SHADER_VISIBILITY_ALL);
+
+	range[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+	paramsRoot[2].InitAsDescriptorTable(1, &range[2]);
+
+	CD3DX12_STATIC_SAMPLER_DESC descSamplers[2];
+	descSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	descSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	descSamplers[1].Init(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	descSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
+	rootDesc.Init(
+		_countof(paramsRoot),
+		paramsRoot,
+		2,
+		descSamplers,
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS);
+
+	Renderer->createRootSignature(&rootDesc, m_rootSignature2D);
+
+	// Shader Compile
+	D3D12_SHADER_BYTECODE PSBytecode = {};
+	D3D12_SHADER_BYTECODE VSBytecode = {};
+	Renderer->CompileShader(L"VertexShader2D.hlsl", "VS2D", VSBytecode, VERTEX_SHADER);
+	Renderer->CompileShader(L"PixelShader2D.hlsl", "PS2D", PSBytecode, PIXEL_SHADER);
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.pRootSignature = m_rootSignature2D;
+	psoDesc.VS = VSBytecode;
+	psoDesc.PS = PSBytecode;
+	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	psoDesc.SampleMask = UINT_MAX;
+	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	psoDesc.DepthStencilState.DepthEnable = false;
+	psoDesc.DepthStencilState.StencilEnable = false;
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	psoDesc.SampleDesc.Count = 1;
+
+	Renderer->createPSO(&psoDesc, m_pipelineState2D);
+
+}
+
 void Terrain::CreateConstantBuffer(Graphics* Renderer)
 {
 	UINT64 bufferSize = sizeof(ConstantBuffer);
@@ -321,8 +410,8 @@ void Terrain::CreateConstantBuffer(Graphics* Renderer)
 
 void Terrain::CreateMesh3D(Graphics* Renderer)
 {
-	int height = 1080;
-	int width = 1920;
+	int height = m_height;
+	int width = m_width;
 	int arraysize = height * width;
 
 	// Vertex Buffer 积己
@@ -392,9 +481,19 @@ void Terrain::CreateMesh3D(Graphics* Renderer)
 
 void Terrain::LoadHeightMap(Graphics* Renderer, const wchar_t* filename)
 {
-	std::unique_ptr<uint8_t[]> decodedData;
-	ID3D12Resource* texture;
-	D3D12_SUBRESOURCE_DATA textureData;
+	// SRV Discriptor Heap 积己
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	Renderer->CreateDescriptorHeap(&srvHeapDesc, m_srvHeap);
+
+	m_srvDescSize = Renderer->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// Displacement Map 且寸
+	std::unique_ptr<uint8_t[]> displacementMapdecodedData;
+	ID3D12Resource* displacementMap;
+	D3D12_SUBRESOURCE_DATA displacementMapData;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC	srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -403,22 +502,42 @@ void Terrain::LoadHeightMap(Graphics* Renderer, const wchar_t* filename)
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
 
-	LoadWICTextureFromFileEx(Renderer->GetDevice(), L"ldem_16.tif", 0, D3D12_RESOURCE_FLAG_NONE, WIC_LOADER_FORCE_RGBA32, &texture, decodedData, textureData);
+	LoadWICTextureFromFileEx(Renderer->GetDevice(), L"ldem_16.tif", 0, D3D12_RESOURCE_FLAG_NONE, WIC_LOADER_FORCE_RGBA32, &displacementMap, displacementMapdecodedData, displacementMapData);
 
-	D3D12_RESOURCE_DESC texDesc = texture->GetDesc();
+	// Color Map 且寸
+	std::unique_ptr<uint8_t[]> colorMapdecodedData;
+	ID3D12Resource* colorMap;
+	D3D12_SUBRESOURCE_DATA colorMapData;
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC colorsrvDesc = {};
+	colorsrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	colorsrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	colorsrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	colorsrvDesc.Texture2D.MipLevels = 1;
+
+	LoadWICTextureFromFileEx(Renderer->GetDevice(), L"lroc_color_poles_4k.tif", 0, D3D12_RESOURCE_FLAG_NONE, WIC_LOADER_FORCE_RGBA32, &colorMap, colorMapdecodedData, colorMapData);
+
+	D3D12_RESOURCE_DESC texDesc = displacementMap->GetDesc();
 	m_width = texDesc.Width;
 	m_height = texDesc.Height;
 
-	const UINT64 uploadBufferSize = GetRequiredIntermediateSize(texture, 0, 1);
+	const UINT64 displacementMapSize = GetRequiredIntermediateSize(displacementMap, 0, 1);
+	const UINT64 colorMapSize = GetRequiredIntermediateSize(colorMap, 0, 1);
 		
 	Renderer->GetDevice()->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize), D3D12_RESOURCE_STATE_GENERIC_READ,
+		&CD3DX12_RESOURCE_DESC::Buffer(displacementMapSize + colorMapSize), D3D12_RESOURCE_STATE_GENERIC_READ,
 		NULL, IID_PPV_ARGS(&m_uploadHeap));
 
 	//const unsigned int subresourceCount = texDesc.DepthOrArraySize * texDesc.MipLevels;
-	UpdateSubresources(Renderer->GetCommandList(), texture, m_uploadHeap, 0, 0, 1, &textureData);
-	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
-	Renderer->CreateSRV(texture, &srvDesc, m_srvHeap);
+	UpdateSubresources(Renderer->GetCommandList(), displacementMap, m_uploadHeap, 0, 0, 1, &displacementMapData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(displacementMap, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+	CD3DX12_CPU_DESCRIPTOR_HANDLE handleSRV(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_srvDescSize);
+	Renderer->CreateSRV(displacementMap, &srvDesc, handleSRV);
+
+	UpdateSubresources(Renderer->GetCommandList(), colorMap, m_uploadHeap, displacementMapSize, 0, 1, &colorMapData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(colorMap, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
+	CD3DX12_CPU_DESCRIPTOR_HANDLE colorhandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 2, m_srvDescSize);
+	Renderer->CreateSRV(colorMap, &colorsrvDesc, colorhandle);
 }
 
 void Terrain::CreateSphere(Graphics* Renderer, float radius, UINT slice, UINT stack)

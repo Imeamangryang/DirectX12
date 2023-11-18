@@ -394,9 +394,9 @@ namespace graphics {
 	}
 
 	// Shader Resource View 积己 窃荐
-	void Graphics::CreateSRV(ID3D12Resource*& texture, D3D12_SHADER_RESOURCE_VIEW_DESC* srvDesc, ID3D12DescriptorHeap* heap)
+	void Graphics::CreateSRV(ID3D12Resource*& texture, D3D12_SHADER_RESOURCE_VIEW_DESC* srvDesc, D3D12_CPU_DESCRIPTOR_HANDLE handle)
 	{
-		m_device->CreateShaderResourceView(texture, srvDesc, heap->GetCPUDescriptorHandleForHeapStart());
+		m_device->CreateShaderResourceView(texture, srvDesc, handle);
 	}
 
 	// Constant buffer view 积己 窃荐

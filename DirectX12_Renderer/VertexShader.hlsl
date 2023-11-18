@@ -22,7 +22,7 @@ VS_OUTPUT VS(float3 input : POSITION) {
 	float scale = height / 100;
 	float4 mysample = heightmap.Load(int3(input));
 	output.pos = float4(input.x, input.y, mysample.r * scale, 1.0f);
-	output.tex = float4(input.x / height, input.y / width, output.pos.z, scale);
+	output.tex = float4(input.x / width, input.y / height, output.pos.z, scale);
 	output.pos = mul(output.pos, viewproj);
 
 	float zb = heightmap.Load(int3(input.xy + int2(0, -1), 0)).r * scale;
