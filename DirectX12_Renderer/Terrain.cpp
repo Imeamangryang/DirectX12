@@ -320,8 +320,10 @@ void Terrain::InitPipeline3D(Graphics* Renderer)
 
 	Renderer->createPSO(&psoDesc, m_pipelineState3D);
 
-	CreateMesh3D(Renderer);
-	//CreateSphere(Renderer, 100, 100, 100);
+	//CreateMesh3D(Renderer);
+	//CreateSphere(Renderer, 10, 30, 30);
+	//CreateGeosphere(Renderer, 17374, 10);
+	CreateGeosphere(Renderer, 1737, 10);
 }
 
 void Terrain::InitPipeline2D(Graphics* Renderer)
@@ -586,7 +588,7 @@ void Terrain::CreateSphere(Graphics* Renderer, float radius, UINT slice, UINT st
 		}
 	}
 
-	vertices.push_back(bottomVertex);
+	//vertices.push_back(bottomVertex);
 
 	int bufferSize = sizeof(Vertex) * vertices.size();
 
@@ -637,6 +639,192 @@ void Terrain::CreateSphere(Graphics* Renderer, float radius, UINT slice, UINT st
 		indices.push_back(baseIndex + i);
 		indices.push_back(baseIndex + i + 1);
 	}
+
+	bufferSize = sizeof(UINT) * indices.size();
+
+	Renderer->CreateCommittedBuffer(m_indexBuffer, m_indexBufferUpload, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+
+	D3D12_SUBRESOURCE_DATA indexData = {};
+	indexData.pData = &indices[0];
+	indexData.RowPitch = bufferSize;
+	indexData.SlicePitch = bufferSize;
+
+	UpdateSubresources(Renderer->GetCommandList(), m_indexBuffer, m_indexBufferUpload, 0, 0, 1, &indexData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER));
+
+	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+	m_indexBufferView.SizeInBytes = bufferSize;
+
+	m_indexcount = indices.size();
+}
+
+void Terrain::CreateGeosphere(Graphics* Renderer, float radius, UINT numSubdivisions)
+{
+	numSubdivisions = min(numSubdivisions, 5u);
+
+	const float X = 0.525731f;
+	const float Z = 0.850651f;
+
+	XMFLOAT3 pos[12] =
+	{
+		XMFLOAT3(-X, 0.0f, Z),  XMFLOAT3(X, 0.0f, Z),
+		XMFLOAT3(-X, 0.0f, -Z), XMFLOAT3(X, 0.0f, -Z),
+		XMFLOAT3(0.0f, Z, X),   XMFLOAT3(0.0f, Z, -X),
+		XMFLOAT3(0.0f, -Z, X),  XMFLOAT3(0.0f, -Z, -X),
+		XMFLOAT3(Z, X, 0.0f),   XMFLOAT3(-Z, X, 0.0f),
+		XMFLOAT3(Z, -X, 0.0f),  XMFLOAT3(-Z, -X, 0.0f)
+	};
+
+	DWORD k[60] =
+	{
+		1,4,0,  4,9,0,  4,5,9,  8,5,4,  1,8,4,
+		1,10,8, 10,3,8, 8,3,5,  3,2,5,  3,7,2,
+		3,10,7, 10,6,7, 6,11,7, 6,0,11, 6,1,0,
+		10,1,6, 11,0,9, 2,11,9, 5,2,9,  11,2,7
+	};
+
+	std::vector<Vertex> vertices;
+	std::vector<UINT> indices;
+
+	vertices.resize(12);
+	indices.resize(60);
+	
+	for (UINT i = 0; i < 12; ++i)
+	{
+		vertices[i].Position = pos[i];
+	}
+
+	for (UINT i = 0; i < 60; ++i)
+	{
+		indices[i] = k[i];
+	}
+
+	for (UINT i = 0; i < numSubdivisions; ++i)
+	{
+		std::vector<Vertex> tempvertices = vertices;
+		std::vector<UINT> tempindices = indices;
+
+		vertices.resize(0);
+		indices.resize(0);
+
+		//       v1
+		//       *
+		//      / \
+		//     /   \
+		//  m0*-----*m1
+		//   / \   / \
+		//  /   \ /   \
+		// *-----*-----*
+		// v0    m2     v2
+
+		UINT numTris = tempindices.size() / 3;
+		for (UINT i = 0; i < numTris; ++i)
+		{
+			Vertex v0 = tempvertices[tempindices[i * 3 + 0]];
+			Vertex v1 = tempvertices[tempindices[i * 3 + 1]];
+			Vertex v2 = tempvertices[tempindices[i * 3 + 2]];
+
+			//
+			// Generate the midpoints.
+			//
+
+			Vertex m0, m1, m2;
+
+			// For subdivision, we just care about the position component.  We derive the other
+			// vertex components in CreateGeosphere.
+
+			m0.Position = XMFLOAT3(
+				0.5f * (v0.Position.x + v1.Position.x),
+				0.5f * (v0.Position.y + v1.Position.y),
+				0.5f * (v0.Position.z + v1.Position.z));
+
+			m1.Position = XMFLOAT3(
+				0.5f * (v1.Position.x + v2.Position.x),
+				0.5f * (v1.Position.y + v2.Position.y),
+				0.5f * (v1.Position.z + v2.Position.z));
+
+			m2.Position = XMFLOAT3(
+				0.5f * (v0.Position.x + v2.Position.x),
+				0.5f * (v0.Position.y + v2.Position.y),
+				0.5f * (v0.Position.z + v2.Position.z));
+
+			//
+			// Add new geometry.
+			//
+
+			vertices.push_back(v0); // 0
+			vertices.push_back(v1); // 1
+			vertices.push_back(v2); // 2
+			vertices.push_back(m0); // 3
+			vertices.push_back(m1); // 4
+			vertices.push_back(m2); // 5
+
+			indices.push_back(i * 6 + 0);
+			indices.push_back(i * 6 + 3);
+			indices.push_back(i * 6 + 5);
+
+			indices.push_back(i * 6 + 3);
+			indices.push_back(i * 6 + 4);
+			indices.push_back(i * 6 + 5);
+
+			indices.push_back(i * 6 + 5);
+			indices.push_back(i * 6 + 4);
+			indices.push_back(i * 6 + 2);
+
+			indices.push_back(i * 6 + 3);
+			indices.push_back(i * 6 + 1);
+			indices.push_back(i * 6 + 4);
+		}
+	}
+
+	// Project vertices onto sphere and scale.
+	for (UINT i = 0; i < vertices.size(); ++i)
+	{
+		// Project onto unit sphere.
+		XMVECTOR n = XMVector3Normalize(XMLoadFloat3(&vertices[i].Position));
+
+		// Project onto sphere.
+		XMVECTOR p = radius * n;
+
+		XMStoreFloat3(&vertices[i].Position, p);
+		XMStoreFloat3(&vertices[i].Normal, n);
+
+		// Derive texture coordinates from spherical coordinates.
+		float theta = MathHelper::AngleFromXY(
+			vertices[i].Position.x,
+			vertices[i].Position.z);
+		
+
+		float phi = acosf(vertices[i].Position.y / radius);
+
+		vertices[i].TexC.x = theta / XM_2PI;
+		vertices[i].TexC.y = phi / XM_PI;
+
+		// Partial derivative of P with respect to theta
+		vertices[i].TangentU.x = -radius * sinf(phi) * sinf(theta);
+		vertices[i].TangentU.y = 0.0f;
+		vertices[i].TangentU.z = +radius * sinf(phi) * cosf(theta);
+
+		XMVECTOR T = XMLoadFloat3(&vertices[i].TangentU);
+		XMStoreFloat3(&vertices[i].TangentU, XMVector3Normalize(T));
+	}
+
+	int bufferSize = sizeof(Vertex) * vertices.size();
+
+	Renderer->CreateCommittedBuffer(m_vertexBuffer, m_vertexBufferUpload, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize));
+
+	D3D12_SUBRESOURCE_DATA vertexData = {};
+	vertexData.pData = &vertices[0];
+	vertexData.RowPitch = bufferSize;
+	vertexData.SlicePitch = bufferSize;
+
+	UpdateSubresources(Renderer->GetCommandList(), m_vertexBuffer, m_vertexBufferUpload, 0, 0, 1, &vertexData);
+	Renderer->GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+	m_vertexBufferView.SizeInBytes = bufferSize;
 
 	bufferSize = sizeof(UINT) * indices.size();
 

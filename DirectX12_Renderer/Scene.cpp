@@ -33,7 +33,7 @@ void Scene::Draw()
 {
 	m_renderer->ResetPipeline();
 
-	const float clearColor[] = { 0.2f, 0.6f, 1.0f, 1.0f };
+	const float clearColor[] = { 0.1f, 0.1f, 0.1f, 1.0f };
 	m_renderer->SetBackBufferRender(m_renderer->GetCommandList(), clearColor);
 
 	SetViewport();

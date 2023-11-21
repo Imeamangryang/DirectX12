@@ -5,11 +5,12 @@ Camera::Camera(int height, int width)
 	m_Yaw = m_Pitch = m_Roll = 0.0f;
 
 	// Projection Matrix 설정
-	XMMATRIX viewproj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), (float)width / (float)height, 0.1f, 4000.0f);
+	XMMATRIX viewproj = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), (float)width / (float)height, 0.1f, 4000.0f);
 	XMStoreFloat4x4(&m_projection, viewproj);
 
 	// 카메라의 Position, Look, Up vector 설정
-	m_pos = XMFLOAT4(0.0f, 0.0f, 150.0f, 0.0f);
+	//m_pos = XMFLOAT4(0.0f, 0.0f, 20000.0f, 0.0f);
+	m_pos = XMFLOAT4(0.0f, 0.0f, 3000.0f, 0.0f);
 
 	m_lookat = XMFLOAT4(1.0f, 1.0f, 0.0f, 0.0f);
 	XMVECTOR look = XMVector3Normalize(XMLoadFloat4(&m_lookat));

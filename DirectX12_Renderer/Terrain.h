@@ -2,9 +2,7 @@
 
 #include "Renderer.h"
 #include "WICTextureLoader.h"
-#include "GeometricPrimitive.h"
-#include "ResourceUploadBatch.h"
-#include "EffectPipelineStateDescription.h"
+#include "MathHelper.h"
 #include <iostream>
 #include <vector>
 
@@ -63,6 +61,7 @@ private:
 	void CreateMesh3D(Graphics* Renderer);
 	void LoadHeightMap(Graphics* Renderer, const wchar_t* filename);
 	void CreateSphere(Graphics* Renderer, float radius, UINT slice, UINT stack);
+	void CreateGeosphere(Graphics* Renderer, float radius, UINT numSubdivisions);
 
 	ID3D12DescriptorHeap* m_srvHeap;
 	ID3D12Resource* m_uploadHeap;
