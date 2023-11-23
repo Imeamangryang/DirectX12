@@ -39,8 +39,8 @@ void Scene::Draw()
 	SetViewport();
 
 	//m_terrain.Draw2D(m_renderer->GetCommandList());
-	m_terrain.Draw3D(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
-	//m_terrain.DrawTes(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+	//m_terrain.Draw3D(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+	m_terrain.DrawTes(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
 
 	m_renderer->SetBackBufferPresent(m_renderer->GetCommandList());
 	CloseCommandList();

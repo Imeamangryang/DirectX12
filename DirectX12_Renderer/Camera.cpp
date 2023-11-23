@@ -10,7 +10,7 @@ Camera::Camera(int height, int width)
 
 	// 카메라의 Position, Look, Up vector 설정
 	//m_pos = XMFLOAT4(0.0f, 0.0f, 20000.0f, 0.0f);
-	m_pos = XMFLOAT4(0.0f, 0.0f, 3000.0f, 0.0f);
+	m_pos = XMFLOAT4(0.0f, 0.0f, 2000.0f, 0.0f);
 
 	m_lookat = XMFLOAT4(1.0f, 1.0f, 0.0f, 0.0f);
 	XMVECTOR look = XMVector3Normalize(XMLoadFloat4(&m_lookat));

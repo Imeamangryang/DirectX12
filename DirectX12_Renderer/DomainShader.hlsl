@@ -1,3 +1,6 @@
+Texture2D<float4> displacementmap : register(t0);
+SamplerState dmsampler : register(s0);
+
 cbuffer ConstantBuffer : register(b0)
 {
 	float4x4 viewproj;
@@ -10,12 +13,12 @@ struct DS_OUTPUT
 {
 	float4 pos : SV_POSITION;
 	float4 norm : NORMAL;
+	float2 tex : TEXCOORD;
 };
 
 struct HS_CONTROL_POINT_OUTPUT
 {
 	float4 pos : POSITION0;
-	float4 norm : NORMAL;
 };
 
 struct HS_CONSTANT_DATA_OUTPUT
@@ -35,8 +38,25 @@ DS_OUTPUT DS(
 	DS_OUTPUT output;
 
 	output.pos = float4(patch[0].pos.xyz * domain.x + patch[1].pos.xyz * domain.y + patch[2].pos.xyz * domain.z, 1);
+	
+	output.norm = float4(normalize(float3(output.pos.xyz)), 1.0f);
+
+	//float scale = height / 10;
+	float scale = height / 100;
+
+	float theta = atan2(output.norm.z, output.norm.x);
+	float phi = acos(output.norm.y);
+
+	output.tex.x = theta / (2.0f * 3.14159265359f);
+	output.tex.y = phi / 3.14159265359f;
+
+	float h = displacementmap.SampleLevel(dmsampler, output.tex.xy, 0).r;
+
+	output.pos.xyz += output.norm * (scale * h);
+
+	output.pos = float4(output.pos.xyz, 1.0f);
+
 	output.pos = mul(output.pos, viewproj);
-	output.norm = float4(patch[0].norm.xyz * domain.x + patch[1].norm.xyz * domain.y + patch[2].norm.xyz * domain.z, 1);
 
 	return output;
 }

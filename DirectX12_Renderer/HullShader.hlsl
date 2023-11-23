@@ -1,13 +1,12 @@
 struct VS_OUTPUT
 {
 	float4 pos : POSITION0;
-	float4 norm : NORMAL;
 };
+
 // Output control point
 struct HS_CONTROL_POINT_OUTPUT
 {
 	float4 pos : POSITION0;
-	float4 norm : NORMAL;
 };
 
 // Output patch constant data.
@@ -25,10 +24,11 @@ HS_CONSTANT_DATA_OUTPUT CalcHSPatchConstants(
 {
 	HS_CONSTANT_DATA_OUTPUT output;
 
-	output.EdgeTessFactor[0] = 4;
-	output.EdgeTessFactor[1] = 4;
-	output.EdgeTessFactor[2] = 4;
-	output.InsideTessFactor = 4;
+	// 테셀레이션 수준 결정
+	output.EdgeTessFactor[0] = 9;
+	output.EdgeTessFactor[1] = 9;
+	output.EdgeTessFactor[2] = 9;
+	output.InsideTessFactor = 9;
 
 	return output;
 }
@@ -47,7 +47,6 @@ HS_CONTROL_POINT_OUTPUT HS(
 
 	// Insert code to compute Output here
 	output.pos = ip[i].pos;
-	output.norm = ip[i].norm;
 
 	return output;
 }

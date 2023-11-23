@@ -112,6 +112,8 @@ void Terrain::DrawTes(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewp
 	m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 	CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 1, m_srvDescSize);
 	m_commandList->SetGraphicsRootDescriptorTable(1, cbvHandle);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE srvhandle2(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 2, m_srvDescSize);
+	m_commandList->SetGraphicsRootDescriptorTable(2, srvhandle2);
 
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST); // describe how to read the vertex buffer.
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
@@ -185,8 +187,8 @@ void Terrain::ClearUnusedUploadBuffersAfterInit()
 
 void Terrain::InitPipelineTes(Graphics* Renderer)
 {
-	CD3DX12_DESCRIPTOR_RANGE range[2];
-	CD3DX12_ROOT_PARAMETER paramsRoot[2];
+	CD3DX12_DESCRIPTOR_RANGE range[3];
+	CD3DX12_ROOT_PARAMETER paramsRoot[3];
 	// Root Signature »ý¼º
 	range[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 	paramsRoot[0].InitAsDescriptorTable(1, &range[0]);
@@ -195,14 +197,21 @@ void Terrain::InitPipelineTes(Graphics* Renderer)
 	range[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 	paramsRoot[1].InitAsDescriptorTable(1, &range[1], D3D12_SHADER_VISIBILITY_ALL);
 
-	CD3DX12_STATIC_SAMPLER_DESC descSamplers[1];
+	// Slot : Color Map, Register(t1)
+	range[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+	paramsRoot[2].InitAsDescriptorTable(1, &range[2]);
+
+	CD3DX12_STATIC_SAMPLER_DESC descSamplers[2];
 	descSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	descSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	descSamplers[1].Init(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	descSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootDesc;
 	rootDesc.Init(
 		_countof(paramsRoot),
 		paramsRoot,
-		1,
+		2,
 		descSamplers,
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -240,7 +249,7 @@ void Terrain::InitPipelineTes(Graphics* Renderer)
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
 	psoDesc.NumRenderTargets = 1;
@@ -248,6 +257,8 @@ void Terrain::InitPipelineTes(Graphics* Renderer)
 	psoDesc.SampleDesc.Count = 1;
 
 	Renderer->createPSO(&psoDesc, m_pipelineStateTes);
+	CreateGeosphere(Renderer, 1737, 10);
+	//CreateGeosphere(Renderer, 17374, 10);
 }
 
 void Terrain::InitPipeline3D(Graphics* Renderer)
