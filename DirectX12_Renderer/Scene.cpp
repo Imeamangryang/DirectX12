@@ -86,7 +86,6 @@ void Scene::HandleMouseInput(int x, int y)
 	m_camera.Yaw(-ROT_ANGLE * x);
 }
 
-
 void Scene::CloseCommandList()
 {
 	if (FAILED(m_renderer->GetCommandList()->Close()))

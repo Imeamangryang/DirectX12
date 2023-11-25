@@ -1,10 +1,22 @@
 Texture2D<float4> displacementmap : register(t0);
 SamplerState dmsampler : register(s0);
 
+struct LightData {
+	float4 pos;
+	float4 amb;
+	float4 dif;
+	float4 spec;
+	float3 att;
+	float rng;
+	float3 dir;
+	float sexp;
+};
+
 cbuffer ConstantBuffer : register(b0)
 {
 	float4x4 viewproj;
 	float4 eye;
+	LightData light;
 	int height;
 	int width;
 }
@@ -55,6 +67,31 @@ DS_OUTPUT DS(
 	output.pos.xyz += output.norm * (scale * h);
 
 	output.pos = float4(output.pos.xyz, 1.0f);
+
+	//float3 x1 = displacementmap.Load(int3(output.pos.xy + int2(1, 0), 0));
+	//float3 x2 = displacementmap.Load(int3(output.pos.xy + int2(-1, 0), 0));
+	//float3 y1 = displacementmap.Load(int3(output.pos.xy + int2(0, 1), 0));
+	//float3 y2 = displacementmap.Load(int3(output.pos.xy + int2(0, -1), 0));
+
+	//// h1 = x1 - x2
+	//// h2 = y1 - y2
+
+	//float x = -2 * (x1.z - x2.z);
+	//float y = -2 * (y1.z - y2.z);
+	//float z = 4;
+
+	//float zb = displacementmap.Load(int3(output.pos.xy + int2(0, -1), 0)).r * scale;
+	//float zc = displacementmap.Load(int3(output.pos.xy + int2(1, 0), 0)).r * scale;
+	//float zd = displacementmap.Load(int3(output.pos.xy + int2(1, 1), 0)).r * scale;
+	//float ze = displacementmap.Load(int3(output.pos.xy + int2(0, 1), 0)).r * scale;
+	//float zf = displacementmap.Load(int3(output.pos.xy + int2(-1, 0), 0)).r * scale;
+	//float zg = displacementmap.Load(int3(output.pos.xy + int2(-1, -1), 0)).r * scale;
+	//
+	//float x = 2 * zf + zc + zg - zb - 2 * zc - zd;
+	//float y = 2 * zb + zc + zg - zd - 2 * ze - zf;
+	//float z = 6.0f;
+
+	//output.norm = float4(normalize(float3(x, y, z)), 1.0f);
 
 	output.pos = mul(output.pos, viewproj);
 

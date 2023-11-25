@@ -5,6 +5,7 @@
 #include "MathHelper.h"
 #include <iostream>
 #include <vector>
+#include "OrbitCycle.h"
 
 using namespace graphics;
 
@@ -12,8 +13,9 @@ struct ConstantBuffer
 {
 	XMFLOAT4X4 viewproj;
 	XMFLOAT4 eye;
-	int height;
-	int width;
+	LightSource light;
+	UINT height;
+	UINT width;
 };
 
 struct Vertex1 
@@ -52,6 +54,8 @@ public:
 
 	void ClearUnusedUploadBuffersAfterInit();
 
+	OrbitCycle GetOrbitcycle() { return m_orbitCycle; }
+
 private:
 
 	void InitPipelineTes(Graphics* Renderer);
@@ -87,4 +91,5 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW	m_indexBufferView;
 	UINT m_indexcount;
+	OrbitCycle m_orbitCycle;
 };

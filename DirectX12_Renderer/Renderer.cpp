@@ -420,6 +420,21 @@ namespace graphics {
 		}
 	}
 
+	// DefaultBuffer 생성 함수
+	void Graphics::CreateDefaultBuffer(ID3D12Resource*& buffer, D3D12_RESOURCE_DESC* texDesc)
+	{
+		if (FAILED(m_device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			texDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			NULL,
+			IID_PPV_ARGS(&buffer))))
+		{
+			throw GFX_Exception("Failed to create default heap on CreateSRV.");
+		}
+	}
+
 	// Shader Compile 함수
 	void Graphics::CompileShader(LPCWSTR filename, LPCSTR entryname, D3D12_SHADER_BYTECODE& shaderBytecode, ShaderType shadertype)
 	{

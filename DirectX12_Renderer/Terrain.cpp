@@ -16,12 +16,13 @@ Terrain::Terrain(Graphics* renderer) :
 	m_vertexBuffer(nullptr),
 	m_vertexBufferUpload(nullptr),
 	m_indexBuffer(nullptr),
-	m_indexBufferUpload(nullptr)
+	m_indexBufferUpload(nullptr),
+	m_orbitCycle(2880)
 {
 	LoadHeightMap(renderer, L"ldem_16.tif");
 	
-	InitPipeline2D(renderer);
-	InitPipeline3D(renderer);
+	//InitPipeline2D(renderer);
+	//InitPipeline3D(renderer);
 	InitPipelineTes(renderer);
 }
 
@@ -101,11 +102,14 @@ void Terrain::DrawTes(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewp
 	m_commandList->SetPipelineState(m_pipelineStateTes);
 	m_commandList->SetGraphicsRootSignature(m_rootSignatureTes);
 
+	m_orbitCycle.Update();
+
 	m_constantBufferData.viewproj = viewproj;
 	m_constantBufferData.eye = eye;
 	m_constantBufferData.height = m_height;
 	m_constantBufferData.width = m_width;
-	memcpy(m_cbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+	m_constantBufferData.light = m_orbitCycle.GetLight();
+	memcpy(m_cbvDataBegin, &m_constantBufferData, sizeof(ConstantBuffer));
 
 	ID3D12DescriptorHeap* heaps[] = { m_srvHeap };
 	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
@@ -197,7 +201,7 @@ void Terrain::InitPipelineTes(Graphics* Renderer)
 	range[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 	paramsRoot[1].InitAsDescriptorTable(1, &range[1], D3D12_SHADER_VISIBILITY_ALL);
 
-	// Slot : Color Map, Register(t1)
+	// Slot3 : Color Map, Register(t1)
 	range[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 	paramsRoot[2].InitAsDescriptorTable(1, &range[2]);
 
@@ -217,6 +221,8 @@ void Terrain::InitPipelineTes(Graphics* Renderer)
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	Renderer->createRootSignature(&rootDesc, m_rootSignatureTes);
+
+	CreateConstantBuffer(Renderer);
 
 	// Shader Compile
 	D3D12_SHADER_BYTECODE PSBytecode = {};
