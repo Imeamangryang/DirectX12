@@ -40,7 +40,14 @@ void Scene::Draw()
 
 	//m_terrain.Draw2D(m_renderer->GetCommandList());
 	//m_terrain.Draw3D(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
-	m_terrain.DrawTes(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+	if (m_DrawMode == 1)
+	{
+		m_terrain.DrawTes(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+	}
+	else
+	{
+		m_terrain.DrawTes_Wireframe(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+	}
 
 	m_renderer->SetBackBufferPresent(m_renderer->GetCommandList());
 	CloseCommandList();
@@ -77,6 +84,14 @@ void Scene::HandleInput(const InputDirections& directions, float deltaTime)
 	if (directions.bDown)
 	{
 		m_camera.Translate(XMFLOAT3(0.0f, 0.0f, -SPEED * deltaTime));
+	}
+	if (directions.bMode1)
+	{
+		m_DrawMode = 1;
+	}
+	if (directions.bMode2)
+	{
+		m_DrawMode = 2;
 	}
 }
 

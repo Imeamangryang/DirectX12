@@ -16,6 +16,8 @@ struct InputDirections
 	BOOL bRight;
 	BOOL bUp;
 	BOOL bDown;
+	BOOL bMode1;
+	BOOL bMode2;
 };
 
 class Scene
@@ -39,4 +41,5 @@ private:
 	Camera m_camera;
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
+	int m_DrawMode = 1;
 };

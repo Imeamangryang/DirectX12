@@ -49,6 +49,7 @@ public:
 	~Terrain();
 
 	void DrawTes(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye);
+	void DrawTes_Wireframe(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye);
 	void Draw3D(ID3D12GraphicsCommandList* m_commandList, XMFLOAT4X4 viewproj, XMFLOAT4 eye);
 	void Draw2D(ID3D12GraphicsCommandList* m_commandList);
 
@@ -59,11 +60,12 @@ public:
 private:
 
 	void InitPipelineTes(Graphics* Renderer);
+	void InitPipelineTes_Wireframe(Graphics* Renderer);
 	void InitPipeline3D(Graphics* Renderer);
 	void InitPipeline2D(Graphics* Renderer);
 	void CreateConstantBuffer(Graphics* Renderer);
 	void CreateMesh3D(Graphics* Renderer);
-	void LoadHeightMap(Graphics* Renderer, const wchar_t* filename);
+	void LoadHeightMap(Graphics* Renderer, const wchar_t* displacementmap, const wchar_t* colormap);
 	void CreateSphere(Graphics* Renderer, float radius, UINT slice, UINT stack);
 	void CreateGeosphere(Graphics* Renderer, float radius, UINT numSubdivisions);
 
@@ -74,9 +76,11 @@ private:
 	UINT m_height;
 
 	ID3D12PipelineState* m_pipelineStateTes;
+	ID3D12PipelineState* m_pipelineStateTes2;
 	ID3D12PipelineState* m_pipelineState3D;
 	ID3D12PipelineState* m_pipelineState2D;
 	ID3D12RootSignature* m_rootSignatureTes;
+	ID3D12RootSignature* m_rootSignatureTes2;
 	ID3D12RootSignature* m_rootSignature3D;
 	ID3D12RootSignature* m_rootSignature2D;
 	ID3D12Resource* m_CBV;

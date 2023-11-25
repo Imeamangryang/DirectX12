@@ -80,9 +80,14 @@ static LRESULT CALLBACK WndProc(HWND win , UINT msg, WPARAM wp, LPARAM lp) {
 				case 'E':
 					g_inputDirections.bUp = true;
 					break;
-
 				case 'Q':
 					g_inputDirections.bDown = true;
+					break;
+				case '1':
+					g_inputDirections.bMode1 = true;
+					break;
+				case '2':
+					g_inputDirections.bMode2 = true;
 					break;
 				default:
 					break;
@@ -114,6 +119,12 @@ static LRESULT CALLBACK WndProc(HWND win , UINT msg, WPARAM wp, LPARAM lp) {
 
 				case 'Q':
 					g_inputDirections.bDown = false;
+					break;
+				case '1':
+					g_inputDirections.bMode1 = false;
+					break;
+				case '2':
+					g_inputDirections.bMode2 = false;
 					break;
 				default:
 					break;
