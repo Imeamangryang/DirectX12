@@ -12,7 +12,7 @@ Camera::Camera(int height, int width)
 	//m_pos = XMFLOAT4(0.0f, 0.0f, 20000.0f, 0.0f);
 	m_pos = XMFLOAT4(0.0f, 0.0f, 2000.0f, 0.0f);
 
-	m_lookat = XMFLOAT4(1.0f, 1.0f, 0.0f, 0.0f);
+	m_lookat = XMFLOAT4(1.0f, 0.0f, 0.0f, 0.0f);
 	XMVECTOR look = XMVector3Normalize(XMLoadFloat4(&m_lookat));
 	XMStoreFloat4(&m_lookat, look);
 

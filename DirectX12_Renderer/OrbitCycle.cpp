@@ -1,7 +1,7 @@
 #include "OrbitCycle.h"
 
 OrbitCycle::OrbitCycle(UINT period) : 
-	m_Sun(XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f), XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f), XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f)),
+	m_Sun(XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f)),
 	m_Moon(XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f), XMFLOAT4(0.4f, 0.4f, 0.4f, 1.0f), XMFLOAT4(0.6f, 0.6f, 0.6f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f)),
 	m_period(period)
 {

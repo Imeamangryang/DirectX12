@@ -1,12 +1,16 @@
 struct VS_OUTPUT
 {
-	float4 pos : POSITION0;
+	float3 pos : POSITION;
+	float3 norm : NORMAL;
+	float3 tan : TANGENT;
 };
 
 // Output control point
 struct HS_CONTROL_POINT_OUTPUT
 {
-	float4 pos : POSITION0;
+	float3 pos : POSITION;
+	float3 norm : NORMAL;
+	float3 tan : TANGENT;
 };
 
 // Output patch constant data.
@@ -47,6 +51,8 @@ HS_CONTROL_POINT_OUTPUT HS(
 
 	// Insert code to compute Output here
 	output.pos = ip[i].pos;
+	output.norm = ip[i].norm;
+	output.tan = ip[i].tan;
 
 	return output;
 }

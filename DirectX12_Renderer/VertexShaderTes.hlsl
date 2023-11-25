@@ -3,7 +3,16 @@ SamplerState dmsampler : register(s0);
 
 struct VS_OUTPUT
 {
-	float4 pos : POSITION0;
+	float3 pos : POSITION;
+	float3 norm : NORMAL;
+	float3 tan : TANGENT;
+};
+
+struct VS_INPUT
+{
+	float3 pos : POSITION;
+	float3 norm : NORMAL;
+	float3 tan : TANGENT;
 };
 
 struct LightData {
@@ -26,10 +35,12 @@ cbuffer ConstantBuffer : register(b0)
 	int width;
 }
 
-VS_OUTPUT VSTes(float3 input : POSITION) {
+VS_OUTPUT VSTes(VS_INPUT input) {
 	VS_OUTPUT output;
 
-	output.pos = float4(input.x, input.y, input.z, 1.0f);
+	output.pos = input.pos;
+	output.norm = input.norm;
+	output.tan = input.tan;
 
 	return output;
 }
