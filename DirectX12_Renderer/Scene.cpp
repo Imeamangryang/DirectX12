@@ -2,6 +2,7 @@
 
 Scene::Scene(int height, int width, Graphics* renderer) : 
 	m_terrain(renderer),
+	m_sky(renderer),
 	m_renderer(renderer),
 	m_camera(height, width)
 {
@@ -21,6 +22,7 @@ Scene::Scene(int height, int width, Graphics* renderer) :
 	m_renderer->LoadAsset();
 
 	m_terrain.ClearUnusedUploadBuffersAfterInit();
+	m_sky.ClearUnusedUploadBuffersAfterInit();
 }
 
 Scene::~Scene()
@@ -43,10 +45,12 @@ void Scene::Draw()
 	if (m_DrawMode == 1)
 	{
 		m_terrain.DrawTes(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+		m_sky.Draw3D(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
 	}
 	else
 	{
 		m_terrain.DrawTes_Wireframe(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
+		m_sky.Draw3D(m_renderer->GetCommandList(), m_camera.GetViewProjectionMatrixTransposed(), m_camera.GetEyePosition());
 	}
 
 	m_renderer->SetBackBufferPresent(m_renderer->GetCommandList());

@@ -1,7 +1,5 @@
-Texture2D<float4> heightmap : register(t0);
-Texture2D<float4> colormap : register(t1);
-SamplerState hmsampler : register(s0);
-SamplerState cmsampler : register(s1);
+Texture2D<float4> skymap : register(t0);
+SamplerState smsampler : register(s0);
 
 cbuffer ConstantBuffer : register(b0)
 {
@@ -20,5 +18,5 @@ struct VS_OUTPUT
 
 float4 PS(VS_OUTPUT input) : SV_TARGET
 {
-	return colormap.Sample(cmsampler, input.tex);
+	return skymap.Sample(smsampler, input.tex);
 }

@@ -2,6 +2,7 @@
 
 #include "Terrain.h"
 #include "Camera.h"
+#include "Sky.h"
 
 using namespace graphics;
 
@@ -38,6 +39,7 @@ private:
 
 	Graphics* m_renderer;
 	Terrain m_terrain;
+	Sky m_sky;
 	Camera m_camera;
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;

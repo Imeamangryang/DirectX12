@@ -7,6 +7,12 @@ struct VS_OUTPUT
 	float2 tex : TEXCOORD;
 };
 
+struct VS_INPUT
+{
+	float3 pos : POSITION;
+	float3 norm : NORMAL;
+};
+
 cbuffer ConstantBuffer : register(b0)
 {
 	float4x4 viewproj;
@@ -15,19 +21,19 @@ cbuffer ConstantBuffer : register(b0)
 	int width;
 }
 
-VS_OUTPUT VS(float3 input : POSITION) {
+VS_OUTPUT VS(VS_INPUT input) {
 	VS_OUTPUT output;
 
-	output.pos = float4(input.x, input.y, input.z, 1.0f);
+	output.pos = float4(input.pos.x, input.pos.y, input.pos.z, 1.0f);
 	output.pos = mul(output.pos, viewproj);
 
-	output.norm = float4(normalize(float3(input)), 1.0f);
+	output.norm = float4(input.norm, 1.0f);
 
-	float theta = atan2(output.norm.z, output.norm.x);
+	float theta = atan2(output.norm.x, output.norm.z);
 	float phi = acos(output.norm.y);
 
-	output.tex.x = theta / (2.0f * 3.14159265359f);
-	output.tex.y = phi / 3.14159265359f;
+	output.tex.x = theta / (2.0f * 3.14f);
+	output.tex.y = phi / 3.14f;
 
 	return output;
 }

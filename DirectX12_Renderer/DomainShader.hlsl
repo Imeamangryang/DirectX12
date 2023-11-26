@@ -58,7 +58,7 @@ DS_OUTPUT DS(
 	output.tan = float3(patch[0].tan.xyz * domain.x + patch[1].tan.xyz * domain.y + patch[2].tan.xyz * domain.z);
 
 	//float scale = height / 10;
-	float scale = height / 100;
+	float scale = height / 150;
 
 	float theta = atan2(output.norm.z, output.norm.x);
 	float phi = acos(output.norm.y);
